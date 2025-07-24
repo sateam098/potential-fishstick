@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32 Remote Control</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            max-width: 600px;
+            width: 100%;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 2.2em;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .ip-section {
+            background: #f8f9ff;
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            border: 2px solid #e1e8ff;
+        }
+
+        .ip-section h3 {
+            color: #444;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+        }
+
+        .ip-input-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        #espIP {
+            flex: 1;
+            padding: 12px 15px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            min-width: 200px;
+        }
+
+        #espIP:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+        }
+
+        .connect-btn, .control-btn {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .connect-btn {
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white;
+        }
+
+        .connect-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(76, 175, 80, 0.4);
+        }
+
+        .connect-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-left: 10px;
+            background: #ff4444;
+            animation: pulse 2s infinite;
+        }
+
+        .status-indicator.connected {
+            background: #4CAF50;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .control-panel {
+            display: none;
+            animation: fadeInUp 0.5s ease;
+        }
+
+        .control-panel.active {
+            display: block;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .device-section {
+            background: #f8f9ff;
+            margin: 20px 0;
+            padding: 25px;
+            border-radius: 15px;
+            border-left: 5px solid #667eea;
+            transition: all 0.3s ease;
+        }
+
+        .device-section:hover {
+            transform: translateX(5px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+
+        .device-section h3 {
+            color: #333;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            font-size: 1.3em;
+        }
+
+        .device-icon {
+            width: 24px;
+            height: 24px;
+            margin-right: 10px;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin-bottom: 15px;
+        }
+
+        .control-btn.on {
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white;
+        }
+
+        .control-btn.off {
+            background: linear-gradient(45deg, #f44336, #d32f2f);
+            color: white;
+        }
+
+        .control-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .servo-control {
+            margin-top: 20px;
+        }
+
+        .servo-slider {
+            width: 100%;
+            height: 8px;
+            border-radius: 4px;
+            background: #ddd;
+            outline: none;
+            margin: 15px 0;
+            appearance: none;
+            cursor: pointer;
+        }
+
+        .servo-slider::-webkit-slider-thumb {
+            appearance: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease;
+        }
+
+        .servo-slider::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        .servo-value {
+            text-align: center;
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #667eea;
+            background: rgba(102, 126, 234, 0.1);
+            padding: 10px;
+            border-radius: 10px;
+            margin-top: 10px;
+        }
+
+        .status-display {
+            background: #e8f5e8;
+            padding: 20px;
+            border-radius: 15px;
+            margin-top: 20px;
+            border: 2px solid #4CAF50;
+        }
+
+        .status-display h3 {
+            color: #2e7d32;
+            margin-bottom: 15px;
+        }
+
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(76, 175, 80, 0.2);
+        }
+
+        .status-item:last-child {
+            border-bottom: none;
+        }
+
+        .status-value {
+            font-weight: bold;
+            padding: 4px 12px;
+            border-radius: 20px;
+            background: #4CAF50;
+            color: white;
+            font-size: 0.9em;
+        }
+
+        .status-value.off {
+            background: #f44336;
+        }
+
+        .error-message {
+            background: #ffebee;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            border-left: 4px solid #f44336;
+            display: none;
+        }
+
+        .success-message {
+            background: #e8f5e8;
+            color: #2e7d32;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            border-left: 4px solid #4CAF50;
+            display: none;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 20px;
+                margin: 10px;
+            }
+            
+            .ip-input-group {
+                flex-direction: column;
+            }
+            
+            #espIP {
+                min-width: 100%;
+                margin-bottom: 10px;
+            }
+            
+            .button-group {
+                justify-content: center;
+            }
+            
+            .control-btn {
+                flex: 1;
+                min-width: 120px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎛️ ESP32 Remote Control</h1>
+        
+        <div class="ip-section">
+            <h3>🌐 เชื่อมต่อ ESP32</h3>
+            <div class="ip-input-group">
+                <input type="text" id="espIP" placeholder="กรอก IP Address ของ ESP32 (เช่น 192.168.1.100)" value="192.168.1.100">
+                <button class="connect-btn" onclick="connectToESP()">
+                    เชื่อมต่อ<span class="status-indicator" id="statusIndicator"></span>
+                </button>
+            </div>
+        </div>
+
+        <div class="success-message" id="successMessage"></div>
+        <div class="error-message" id="errorMessage"></div>
+
+        <div class="control-panel" id="controlPanel">
+            <div class="device-section">
+                <h3><span class="device-icon">🌪️</span>พัดลม (Pin 14)</h3>
+                <div class="button-group">
+                    <button class="control-btn on" onclick="controlDevice('fan', 'on')">เปิดพัดลม</button>
+                    <button class="control-btn off" onclick="controlDevice('fan', 'off')">ปิดพัดลม</button>
+                </div>
+            </div>
+
+            <div class="device-section">
+                <h3><span class="device-icon">💡</span>ไฟ (Pin 12)</h3>
+                <div class="button-group">
+                    <button class="control-btn on" onclick="controlDevice('light', 'on')">เปิดไฟ</button>
+                    <button class="control-btn off" onclick="controlDevice('light', 'off')">ปิดไฟ</button>
+                </div>
+            </div>
+
+            <div class="device-section">
+                <h3><span class="device-icon">⚙️</span>เซอร์โว (Pin 13)</h3>
+                <div class="servo-control">
+                    <input type="range" min="0" max="180" value="90" class="servo-slider" id="servoSlider" oninput="updateServo(this.value)">
+                    <div class="servo-value">
+                        มุม: <span id="servoValue">90</span>°
+                    </div>
+                </div>
+            </div>
+
+            <div class="status-display" id="statusDisplay">
+                <h3>📊 สถานะปัจจุบัน</h3>
+                <div class="status-item">
+                    <span>พัดลม:</span>
+                    <span class="status-value off" id="fanStatus">OFF</span>
+                </div>
+                <div class="status-item">
+                    <span>ไฟ:</span>
+                    <span class="status-value off" id="lightStatus">OFF</span>
+                </div>
+                <div class="status-item">
+                    <span>เซอร์โว:</span>
+                    <span class="status-value" id="servoStatus">90°</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let espIP = '';
+        let isConnected = false;
+        let statusUpdateInterval;
+
+        function showMessage(message, isError = false) {
+            const errorElement = document.getElementById('errorMessage');
+            const successElement = document.getElementById('successMessage');
+            
+            if (isError) {
+                errorElement.textContent = message;
+                errorElement.style.display = 'block';
+                successElement.style.display = 'none';
+            } else {
+                successElement.textContent = message;
+                successElement.style.display = 'block';
+                errorElement.style.display = 'none';
+            }
+            
+            setTimeout(() => {
+                errorElement.style.display = 'none';
+                successElement.style.display = 'none';
+            }, 5000);
+        }
+
+        function updateConnectionStatus(connected) {
+            const indicator = document.getElementById('statusIndicator');
+            const connectBtn = document.querySelector('.connect-btn');
+            const controlPanel = document.getElementById('controlPanel');
+            
+            isConnected = connected;
+            
+            if (connected) {
+                indicator.classList.add('connected');
+                connectBtn.textContent = 'เชื่อมต่อแล้ว ';
+                connectBtn.appendChild(indicator);
+                connectBtn.disabled = true;
+                controlPanel.classList.add('active');
+                startStatusUpdate();
+                showMessage('เชื่อมต่อ ESP32 สำเร็จ!');
+            } else {
+                indicator.classList.remove('connected');
+                connectBtn.textContent = 'เชื่อมต่อ ';
+                connectBtn.appendChild(indicator);
+                connectBtn.disabled = false;
+                controlPanel.classList.remove('active');
+                stopStatusUpdate();
+            }
+        }
+
+        async function connectToESP() {
+            const ipInput = document.getElementById('espIP');
+            espIP = ipInput.value.trim();
+            
+            if (!espIP) {
+                showMessage('กรุณากรอก IP Address', true);
+                return;
+            }
+
+            // Validate IP format
+            const ipRegex = /^(\d{1,3}\.){3}\d{1,3}$/;
+            if (!ipRegex.test(espIP)) {
+                showMessage('รูปแบบ IP Address ไม่ถูกต้อง', true);
+                return;
+            }
+
+            try {
+                const response = await fetch(`http://${espIP}/status`, {
+                    method: 'GET',
+                    timeout: 5000
+                });
+                
+                if (response.ok) {
+                    updateConnectionStatus(true);
+                    updateStatus();
+                } else {
+                    throw new Error('ไม่สามารถเชื่อมต่อได้');
+                }
+            } catch (error) {
+                console.error('Connection error:', error);
+                showMessage(`ไม่สามารถเชื่อมต่อ ESP32 ได้: ${error.message}`, true);
+                updateConnectionStatus(false);
+            }
+        }
+
+        async function controlDevice(device, action) {
+            if (!isConnected) {
+                showMessage('กรุณาเชื่อมต่อ ESP32 ก่อน', true);
+                return;
+            }
+
+            try {
+                const response = await fetch(`http://${espIP}/${device}/${action}`, {
+                    method: 'GET'
+                });
+                
+                if (response.ok) {
+                    const result = await response.text();
+                    showMessage(result);
+                    updateStatus();
+                } else {
+                    throw new Error('คำสั่งไม่สำเร็จ');
+                }
+            } catch (error) {
+                console.error('Control error:', error);
+                showMessage(`เกิดข้อผิดพลาด: ${error.message}`, true);
+            }
+        }
+
+        async function updateServo(angle) {
+            document.getElementById('servoValue').textContent = angle;
+            
+            if (!isConnected) return;
+
+            try {
+                const response = await fetch(`http://${espIP}/servo?angle=${angle}`, {
+                    method: 'GET'
+                });
+                
+                if (response.ok) {
+                    updateStatus();
+                }
+            } catch (error) {
+                console.error('Servo control error:', error);
+            }
+        }
+
+        async function updateStatus() {
+            if (!isConnected) return;
+
+            try {
+                const response = await fetch(`http://${espIP}/status`, {
+                    method: 'GET'
+                });
+                
+                if (response.ok) {
+                    const status = await response.json();
+                    
+                    // Update fan status
+                    const fanStatus = document.getElementById('fanStatus');
+                    fanStatus.textContent = status.fan ? 'ON' : 'OFF';
+                    fanStatus.className = `status-value ${status.fan ? '' : 'off'}`;
+                    
+                    // Update light status
+                    const lightStatus = document.getElementById('lightStatus');
+                    lightStatus.textContent = status.light ? 'ON' : 'OFF';
+                    lightStatus.className = `status-value ${status.light ? '' : 'off'}`;
+                    
+                    // Update servo status
+                    const servoStatus = document.getElementById('servoStatus');
+                    servoStatus.textContent = status.servo + '°';
+                    servoStatus.className = 'status-value';
+                    
+                    // Update servo slider
+                    document.getElementById('servoSlider').value = status.servo;
+                    document.getElementById('servoValue').textContent = status.servo;
+                } else {
+                    throw new Error('ไม่สามารถอ่านสถานะได้');
+                }
+            } catch (error) {
+                console.error('Status update error:', error);
+                showMessage('การเชื่อมต่อขาดหาย กำลังพยายามเชื่อมต่อใหม่...', true);
+                updateConnectionStatus(false);
+            }
+        }
+
+        function startStatusUpdate() {
+            statusUpdateInterval = setInterval(updateStatus, 2000);
+        }
+
+        function stopStatusUpdate() {
+            if (statusUpdateInterval) {
+                clearInterval(statusUpdateInterval);
+            }
+        }
+
+        // เชื่อมต่ออัตโนมัติเมื่อกด Enter ในช่อง IP
+        document.getElementById('espIP').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                connectToESP();
+            }
+        });
+
+        // ลองเชื่อมต่ออัตโนมัติเมื่อโหลดหน้า
+        window.addEventListener('load', function() {
+            const savedIP = localStorage.getItem('espIP');
+            if (savedIP) {
+                document.getElementById('espIP').value = savedIP;
+            }
+        });
+
+        // บันทึก IP ล่าสุดที่ใช้
+        function saveIP() {
+            const ip = document.getElementById('espIP').value;
+            if (ip) {
+                localStorage.setItem('espIP', ip);
+            }
+        }
+
+        document.getElementById('espIP').addEventListener('input', saveIP);
+    </script>
+</body>
+</html>
